@@ -11,7 +11,7 @@ class PackageInstaller(clustersetup.DefaultClusterSetup):
     setup_class = starcluster.plugins.pkginstaller.PackageInstaller
     packages = mongodb, python-mongodb
     """
-    def __init__(self, packages=None, update=True):
+    def __init__(self, packages=None, update=False):
         super(PackageInstaller, self).__init__()
         self.packages = packages
         self.update = update
