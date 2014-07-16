@@ -1,3 +1,20 @@
+# Copyright 2009-2014 Justin Riley
+#
+# This file is part of StarCluster.
+#
+# StarCluster is free software: you can redistribute it and/or modify it under
+# the terms of the GNU Lesser General Public License as published by the Free
+# Software Foundation, either version 3 of the License, or (at your option) any
+# later version.
+#
+# StarCluster is distributed in the hope that it will be useful, but WITHOUT
+# ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+# FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public License for more
+# details.
+#
+# You should have received a copy of the GNU Lesser General Public License
+# along with StarCluster. If not, see <http://www.gnu.org/licenses/>.
+
 """
 StarCluster logging module
 """
@@ -83,7 +100,7 @@ class ConsoleLogger(logging.StreamHandler):
         if record.levelno in [ERROR, CRITICAL, FATAL]:
             stream = self.error_stream
         if not hasattr(types, "UnicodeType"):
-             # if no unicode support...
+            # if no unicode support...
             stream.write(fs % msg)
         else:
             try:
@@ -152,11 +169,11 @@ def configure_sc_logging(use_syslog=False):
         log.addHandler(syslog_handler)
 
 
-def configure_ssh_logging():
+def configure_paramiko_logging():
     """
     Configure ssh to log to a file for debug
     """
-    l = logging.getLogger("ssh")
+    l = logging.getLogger("paramiko")
     l.setLevel(logging.DEBUG)
     static.create_sc_config_dirs()
     lh = logging.handlers.RotatingFileHandler(static.SSH_DEBUG_FILE,
@@ -200,7 +217,7 @@ def get_log_for_pid(pid):
         if pid_str in line:
             yield line
             found_pid = True
-        elif found_pid and not ' PID: ' in line:
+        elif found_pid and ' PID: ' not in line:
             yield line
         else:
             found_pid = False

@@ -1,3 +1,20 @@
+# Copyright 2009-2014 Justin Riley
+#
+# This file is part of StarCluster.
+#
+# StarCluster is free software: you can redistribute it and/or modify it under
+# the terms of the GNU Lesser General Public License as published by the Free
+# Software Foundation, either version 3 of the License, or (at your option) any
+# later version.
+#
+# StarCluster is distributed in the hope that it will be useful, but WITHOUT
+# ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+# FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public License for more
+# details.
+#
+# You should have received a copy of the GNU Lesser General Public License
+# along with StarCluster. If not, see <http://www.gnu.org/licenses/>.
+
 import os
 import posixpath
 
@@ -53,7 +70,7 @@ class CreateUsers(clustersetup.DefaultClusterSetup):
                                                  user_shell)
         for node in nodes:
             self.pool.simple_job(node.ssh.execute,
-                                 ("echo '%s' | newusers" % newusers),
+                                 ("echo -n '%s' | newusers" % newusers),
                                  jobid=node.alias)
         self.pool.wait(numtasks=len(nodes))
         log.info("Configuring passwordless ssh for %d cluster users" %
@@ -80,7 +97,8 @@ class CreateUsers(clustersetup.DefaultClusterSetup):
             master.ssh.execute(
                 "cp /home/%(user)s/.ssh/id_rsa %(keydest)s" %
                 dict(user=user, keydest=posixpath.join(pardir, user + '.rsa')))
-        cluster_tag = master.cluster_groups[0].name.replace('@sc-', '')
+        cluster_tag = master.cluster_groups[0].name.replace(
+            static.SECURITY_GROUP_PREFIX, '')
         tarfile = "%s-%s.tar.gz" % (cluster_tag, master.region.name)
         master.ssh.execute("tar -C %s -czf ~/%s . --exclude=%s" %
                            (pardir, tarfile, bfile))
@@ -137,7 +155,7 @@ class CreateUsers(clustersetup.DefaultClusterSetup):
         log.info("Creating %d users on %s" % (self._num_users, node.alias))
         newusers = self._get_newusers_batch_file(master, self._usernames,
                                                  user_shell)
-        node.ssh.execute("echo '%s' | newusers" % newusers)
+        node.ssh.execute("echo -n '%s' | newusers" % newusers)
         log.info("Adding %s to known_hosts for %d users" %
                  (node.alias, self._num_users))
         pbar = self.pool.progress_bar.reset()

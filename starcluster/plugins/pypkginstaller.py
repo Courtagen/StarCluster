@@ -1,3 +1,20 @@
+# Copyright 2009-2014 Justin Riley
+#
+# This file is part of StarCluster.
+#
+# StarCluster is free software: you can redistribute it and/or modify it under
+# the terms of the GNU Lesser General Public License as published by the Free
+# Software Foundation, either version 3 of the License, or (at your option) any
+# later version.
+#
+# StarCluster is distributed in the hope that it will be useful, but WITHOUT
+# ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+# FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public License for more
+# details.
+#
+# You should have received a copy of the GNU Lesser General Public License
+# along with StarCluster. If not, see <http://www.gnu.org/licenses/>.
+
 """Install python packages using pip
 
 Packages are downloaded/installed in parallel, allowing for faster installs
@@ -15,7 +32,7 @@ and the latest released version of some dependencies::
 
     [plugin ipython-dev]
     setup_class = starcluster.plugins.pypkginstaller.PyPkgInstaller
-    install_cmd = pip install -U %s
+    install_command = pip install -U %s
     packages = pyzmq,
                python-msgpack,
                git+http://github.com/ipython/ipython.git

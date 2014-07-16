@@ -1,9 +1,28 @@
+# Copyright 2009-2014 Justin Riley
+#
+# This file is part of StarCluster.
+#
+# StarCluster is free software: you can redistribute it and/or modify it under
+# the terms of the GNU Lesser General Public License as published by the Free
+# Software Foundation, either version 3 of the License, or (at your option) any
+# later version.
+#
+# StarCluster is distributed in the hope that it will be useful, but WITHOUT
+# ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+# FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public License for more
+# details.
+#
+# You should have received a copy of the GNU Lesser General Public License
+# along with StarCluster. If not, see <http://www.gnu.org/licenses/>.
+
 """
 StarCluster SunGrinEngine stats visualizer module
 """
 import os
 import numpy as np
 from datetime import datetime
+import matplotlib
+matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
 from starcluster.logger import log
@@ -53,7 +72,7 @@ class SGEVisualizer(object):
         vals = {'queued': self.records.queued_jobs,
                 'running': self.records.running_jobs,
                 'num_hosts': self.records.hosts,
-                #'slots': self.records.slots,
+                # 'slots': self.records.slots,
                 'avg_duration': self.records.avg_duration,
                 'avg_wait': self.records.avg_wait,
                 'avg_load': self.records.avg_load}

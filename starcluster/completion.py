@@ -1,200 +1,75 @@
-#*****************************************************************************\
-#* Copyright (c) 2003-2004, Martin Blais
-#* All rights reserved.
-#*
-#* Redistribution and use in source and binary forms, with or without
-#* modification, are permitted provided that the following conditions are
-#* met:
-#*
-#* * Redistributions of source code must retain the above copyright
-#*   notice, this list of conditions and the following disclaimer.
-#*
-#* * Redistributions in binary form must reproduce the above copyright
-#*   notice, this list of conditions and the following disclaimer in the
-#*   documentation and/or other materials provided with the distribution.
-#*
-#* * Neither the name of the Martin Blais, Furius, nor the names of its
-#*   contributors may be used to endorse or promote products derived from
-#*   this software without specific prior written permission.
-#*
-#* THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-#* "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-#* LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-#* A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-#* OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-#* SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-#* LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-#* DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-#* THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-#* (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-#* OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-#*****************************************************************************\
+# Copyright 2009-2014 Justin Riley
+#
+# This file is part of StarCluster.
+#
+# StarCluster is free software: you can redistribute it and/or modify it under
+# the terms of the GNU Lesser General Public License as published by the Free
+# Software Foundation, either version 3 of the License, or (at your option) any
+# later version.
+#
+# StarCluster is distributed in the hope that it will be useful, but WITHOUT
+# ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+# FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public License for more
+# details.
+#
+# You should have received a copy of the GNU Lesser General Public License
+# along with StarCluster. If not, see <http://www.gnu.org/licenses/>.
 
-"""Automatic completion for optparse module.
-
-This module provide automatic bash completion support for programs that use the
-optparse module.  The premise is that the optparse options parser specifies
-enough information (and more) for us to be able to generate completion strings
-easily.  Another advantage of this over traditional completion schemes where
-the completion strings are hard-coded in a separate bash source file, is that
-the same code that parses the options is used to generate the completions, so
-the completions is always up-to-date with the program itself.
-
-In addition, we allow you specify a list of regular expressions or code that
-define what kinds of files should be proposed as completions to this file if
-needed.  If you want to implement more complex behavior, you can instead
-specify a function, which will be called with the current directory as an
-argument.
-
-You need to activate bash completion using the shell script function that comes
-with optcomplete (see http://furius.ca/optcomplete for more details).
-
-"""
-
-__version__ = "$Revision$"
-__author__ = "Martin Blais <blais@furius.ca>"
-
-## Bash Protocol Description
-## -------------------------
-##
-## `COMP_CWORD'
-##      An index into `${COMP_WORDS}' of the word containing the current
-##      cursor position.  This variable is available only in shell
-##      functions invoked by the programmable completion facilities (*note
-##      Programmable Completion::).
-##
-## `COMP_LINE'
-##      The current command line.  This variable is available only in
-##      shell functions and external commands invoked by the programmable
-##      completion facilities (*note Programmable Completion::).
-##
-## `COMP_POINT'
-##      The index of the current cursor position relative to the beginning
-##      of the current command.  If the current cursor position is at the
-##      end of the current command, the value of this variable is equal to
-##      `${#COMP_LINE}'.  This variable is available only in shell
-##      functions and external commands invoked by the programmable
-##      completion facilities (*note Programmable Completion::).
-##
-## `COMP_WORDS'
-##      An array variable consisting of the individual words in the
-##      current command line.  This variable is available only in shell
-##      functions invoked by the programmable completion facilities (*note
-##      Programmable Completion::).
-##
-## `COMPREPLY'
-##      An array variable from which Bash reads the possible completions
-##      generated by a shell function invoked by the programmable
-##      completion facility (*note Programmable Completion::).
+#  Bash Protocol Description
+#  -------------------------
+#
+#  `COMP_CWORD'
+#       An index into `${COMP_WORDS}' of the word containing the current
+#       cursor position.  This variable is available only in shell
+#       functions invoked by the programmable completion facilities (*note
+#       Programmable Completion::).
+#
+#  `COMP_LINE'
+#       The current command line.  This variable is available only in
+#       shell functions and external commands invoked by the programmable
+#       completion facilities (*note Programmable Completion::).
+#
+#  `COMP_POINT'
+#       The index of the current cursor position relative to the beginning
+#       of the current command.  If the current cursor position is at the
+#       end of the current command, the value of this variable is equal to
+#       `${#COMP_LINE}'.  This variable is available only in shell
+#       functions and external commands invoked by the programmable
+#       completion facilities (*note Programmable Completion::).
+#
+#  `COMP_WORDS'
+#       An array variable consisting of the individual words in the
+#       current command line.  This variable is available only in shell
+#       functions invoked by the programmable completion facilities (*note
+#       Programmable Completion::).
+#
+#  `COMPREPLY'
+#       An array variable from which Bash reads the possible completions
+#       generated by a shell function invoked by the programmable
+#       completion facility (*note Programmable Completion::).
 
 
 import os
-import sys
-import types
 import re
+import sys
+import copy
+import types
+import logging
+import optparse
 
 from pprint import pformat
-
 from optparse import OptionParser
+
+import optcomplete
+from optcomplete import AllCompleter
+from optcomplete import DirCompleter
+from optcomplete import ListCompleter
+from optcomplete import NoneCompleter
+from optcomplete import RegexCompleter
 
 from starcluster import static
 
 debugfn = os.path.join(static.STARCLUSTER_LOG_DIR, 'completion-debug.log')
-
-
-class AllCompleter(object):
-
-    """Completes by listing all possible files in current directory."""
-
-    def __call__(self, pwd, line, point, prefix, suffix):
-        return os.listdir(pwd)
-
-
-class NoneCompleter(object):
-
-    """Generates empty completion list."""
-
-    def __call__(self, pwd, line, point, prefix, suffix):
-        return []
-
-
-class DirCompleter(object):
-
-    """Completes by listing subdirectories only."""
-
-    def __call__(self, pwd, line, point, prefix, suffix):
-        return filter(os.path.isdir, os.listdir(pwd))
-
-
-class RegexCompleter(object):
-
-    """Completes by filtering all possible files with the given list of
-    regexps."""
-
-    def __init__(self, regexlist, always_dirs=True):
-        self.always_dirs = always_dirs
-
-        if isinstance(regexlist, types.StringType):
-            regexlist = [regexlist]
-        self.regexlist = []
-        for r in regexlist:
-            if isinstance(r, types.StringType):
-                r = re.compile(r)
-            self.regexlist.append(r)
-
-    def __call__(self, pwd, line, point, prefix, suffix):
-        dn = os.path.dirname(prefix)
-        if dn:
-            pwd = dn
-        files = os.listdir(pwd)
-        ofiles = []
-        for fn in files:
-            for r in self.regexlist:
-                if r.match(fn):
-                    if dn:
-                        fn = os.path.join(dn, fn)
-                    ofiles.append(fn)
-                    break
-            if self.always_dirs and os.path.isdir(fn):
-                ofiles.append(fn + '/')
-        return ofiles
-
-
-class ListCompleter(object):
-
-    """Completes by filtering using a fixed list of strings."""
-
-    def __init__(self, stringlist):
-        self.olist = stringlist
-
-    def __call__(self, pwd, line, point, prefix, suffix):
-        return self.olist
-
-
-def extract_word(line, point):
-
-    """Return a prefix and suffix of the enclosing word.  The character under
-    the cursor is the first character of the suffix."""
-
-    wsre = re.compile('[ \t]')
-
-    if point < 0 or point > len(line):
-        return '', ''
-
-    preii = point - 1
-    while preii >= 0:
-        if wsre.match(line[preii]):
-            break
-        preii -= 1
-    preii += 1
-
-    sufii = point
-    while sufii < len(line):
-        if wsre.match(line[sufii]):
-            break
-        sufii += 1
-
-    return line[preii:point], line[point:sufii]
 
 
 def autocomplete(parser,
@@ -237,7 +112,7 @@ def autocomplete(parser,
     if opt_completer is None:
         opt_completer = NoneCompleter()
     if subcmd_completer is None:
-        ## subcmd_completer = arg_completer
+        # subcmd_completer = arg_completer
         subcmd_completer = NoneCompleter()
 
     # By default, completion will be arguments completion, unless we find out
@@ -252,7 +127,7 @@ def autocomplete(parser,
 
     # zsh's bashcompinit does not pass COMP_WORDS, replace with
     # COMP_LINE for now...
-    if not 'COMP_WORDS' in os.environ:
+    if 'COMP_WORDS' not in os.environ:
         os.environ['COMP_WORDS'] = os.environ['COMP_LINE']
 
     cwords = os.environ['COMP_WORDS'].split()
@@ -283,7 +158,7 @@ def autocomplete(parser,
                     sys.exit(1)  # no completions for that command object
 
     # Extract word enclosed word.
-    prefix, suffix = extract_word(cline, cpoint)
+    prefix, suffix = optcomplete.extract_word(cline, cpoint)
     # The following would be less exact, but will work nonetheless .
     # prefix, suffix = cwords[cword], None
 
@@ -386,7 +261,6 @@ def guess_first_nonoption(gparser, subcmds_map):
     subcommand syntax, so that we can generate the appropriate completions for
     the subcommand."""
 
-    import copy
     gparser = copy.deepcopy(gparser)
 
     def print_usage_nousage(self, file=None):
@@ -427,8 +301,7 @@ def guess_first_nonoption(gparser, subcmds_map):
     return value  # can be None, indicates no command chosen.
 
 
-class CmdComplete(object):
-
+class CmdComplete(optcomplete.CmdComplete):
     """Simple default base class implementation for a subcommand that supports
     command completion.  This class is assuming that there might be a method
     addopts(self, parser) to declare options for this subcommand, and an
@@ -437,9 +310,7 @@ class CmdComplete(object):
     to have it here."""
 
     def autocomplete(self, completer):
-        import logging
         logging.disable(logging.CRITICAL)
-        import optparse
         parser = optparse.OptionParser(self.__doc__.strip())
         if hasattr(self, 'addopts'):
             self.addopts(parser)
@@ -448,17 +319,12 @@ class CmdComplete(object):
         logging.disable(logging.NOTSET)
         return autocomplete(parser, completer)
 
+NoneCompleter = NoneCompleter
+ListCompleter = ListCompleter
+AllCompleter = AllCompleter
+DirCompleter = DirCompleter
+RegexCompleter = RegexCompleter
 
-def test():
-    print extract_word("extraire un mot d'une phrase", 11)
-    print extract_word("extraire un mot d'une phrase", 12)
-    print extract_word("extraire un mot d'une phrase", 13)
-    print extract_word("extraire un mot d'une phrase", 14)
-    print extract_word("extraire un mot d'une phrase", 0)
-    print extract_word("extraire un mot d'une phrase", 28)
-    print extract_word("extraire un mot d'une phrase", 29)
-    print extract_word("extraire un mot d'une phrase", -2)
-    print extract_word("optcomplete-test do", 19)
 
 if __name__ == '__main__':
-    test()
+    optcomplete.test()

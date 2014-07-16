@@ -1,3 +1,20 @@
+# Copyright 2009-2014 Justin Riley
+#
+# This file is part of StarCluster.
+#
+# StarCluster is free software: you can redistribute it and/or modify it under
+# the terms of the GNU Lesser General Public License as published by the Free
+# Software Foundation, either version 3 of the License, or (at your option) any
+# later version.
+#
+# StarCluster is distributed in the hope that it will be useful, but WITHOUT
+# ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+# FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public License for more
+# details.
+#
+# You should have received a copy of the GNU Lesser General Public License
+# along with StarCluster. If not, see <http://www.gnu.org/licenses/>.
+
 import os
 import copy
 import tempfile
@@ -122,14 +139,14 @@ class TestStarClusterConfig(tests.StarClusterTest):
         c3_settings = ['__name__', 'extends', 'keyname', 'key_location',
                        'cluster_size', 'volumes']
         for key in c1:
-            if key in c2 and not key in c2_settings:
+            if key in c2 and key not in c2_settings:
                 assert c2[key] == c1[key]
             else:
                 # below only true for default test config
                 # not required in general
                 assert c2[key] != c1[key]
         for key in c2:
-            if key in c3 and not key in c3_settings:
+            if key in c3 and key not in c3_settings:
                 assert c3[key] == c2[key]
             else:
                 # below only true for default test config
@@ -237,6 +254,8 @@ class TestStarClusterConfig(tests.StarClusterTest):
         cfg = config.StarClusterConfig(tmp_file.name, cache=True).load()
         assert cfg.aws['aws_access_key_id'] == aws_key
         assert cfg.aws['aws_secret_access_key'] == aws_secret_key
+        del os.environ['AWS_ACCESS_KEY_ID']
+        del os.environ['AWS_SECRET_ACCESS_KEY']
 
     def test_cyclical_extends(self):
         """

@@ -1,16 +1,33 @@
+# Copyright 2009-2014 Justin Riley
+#
+# This file is part of StarCluster.
+#
+# StarCluster is free software: you can redistribute it and/or modify it under
+# the terms of the GNU Lesser General Public License as published by the Free
+# Software Foundation, either version 3 of the License, or (at your option) any
+# later version.
+#
+# StarCluster is distributed in the hope that it will be useful, but WITHOUT
+# ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+# FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public License for more
+# details.
+#
+# You should have received a copy of the GNU Lesser General Public License
+# along with StarCluster. If not, see <http://www.gnu.org/licenses/>.
+
 import sys
 import time
 from threading import Thread
 
 
 class Spinner(Thread):
-    #Set the screen position of the spinner (chars from the left).
+    # Set the screen position of the spinner (chars from the left).
     spin_screen_pos = 1
-    #Set the current index position in the spinner character list.
+    # Set the current index position in the spinner character list.
     char_index_pos = 0
-    #Set the time between character changes in the spinner.
+    # Set the time between character changes in the spinner.
     sleep_time = 1
-    #Set the spinner type: 0-3
+    # Set the spinner type: 0-3
     spin_type = 2
 
     def __init__(self, type=spin_type):

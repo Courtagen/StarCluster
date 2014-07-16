@@ -47,15 +47,22 @@ called ``smallcluster`` that is set as the default *cluster template*.
 Storing the config in an alternate location
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 If you wish to store your StarCluster config in a location other than the
-default (``~/.starcluster/config``) you will need to specify the global
-``--config`` (``-c``) option with every StarCluster command you use. For
-example::
+default (``~/.starcluster/config``), you will need to set the
+``STARCLUSTER_CONFIG`` environment variable to point to your file::
+
+    $ export STARCLUSTER_CONFIG="/path/to/starcluster/config"
+
+After doing so, all StarCluster commands will use the config identified by
+``STARCLUSTER_CONFIG``.
+
+Alternatively, you can specify the global ``--config`` (``-c``) option with
+every StarCluster command you use. For example::
 
     $ starcluster -c /path/to/starcluster/config listclusters
 
-In the above example, if the config didn't exist at the specified path you
-would be prompted with the same menu above offering to generate a template at
-the specified path::
+In either case, if the config didn't exist at the specified path you would be
+prompted with the same menu above offering to generate a template at the
+specified path::
 
     $ starcluster -c /path/to/nonexistent/config listclusters
     StarCluster - (http://star.mit.edu/cluster)
@@ -100,6 +107,16 @@ required:
     aws_user_id= #your userid
     ec2_cert = /path/to/your/ec2_cert.pem
     ec2_private_key = /path/to/your/ec2_pk.pem
+
+All of the settings in the **[aws info]** section can be overridden by the
+environment. StarCluster will log a warning whenever it uses settings from the
+environment. For example::
+
+   $ export AWS_ACCESS_KEY_ID=your_aws_access_key_id
+   $ export AWS_SECRET_ACCESS_KEY=your_secret_access_key
+   $ starcluster listclusters
+   *** WARNING - Setting 'AWS_SECRET_ACCESS_KEY' from environment...
+   *** WARNING - Setting 'AWS_ACCESS_KEY_ID' from environment...
 
 Amazon EC2 Regions
 ------------------
@@ -265,48 +282,175 @@ In order to launch StarCluster(s) on Amazon EC2, you must first provide a
 *cluster template* has been defined, you can launch multiple StarClusters from
 it. Below is an example *cluster template* called ``smallcluster`` which
 defines a 2-node cluster using ``m1.small`` EC2 instances and the mykeypair1
-keypair we defined above.
+keypair we defined above:
 
 .. code-block:: ini
 
-    # Sections starting with "cluster" define your cluster templates
-    # The section name is the name you give to your cluster template e.g.:
     [cluster smallcluster]
-    # change this to the name of one of the keypair sections defined above
-    # (see the EC2 getting started guide tutorial on using ec2-add-keypair to learn
-    # how to create new keypairs)
     keyname = mykeypair1
-
-    # number of ec2 instances to launch
     cluster_size = 2
-
-    # create the following user on the cluster
     cluster_user = sgeadmin
-    # optionally specify shell (defaults to bash)
-    # options: bash, zsh, csh, ksh, tcsh
     cluster_shell = bash
-
-    # AMI for master node. Defaults to NODE_IMAGE_ID if not specified
-    # The base i386 StarCluster AMI is ami-0330d16a
-    # The base x86_64 StarCluster AMI is ami-0f30d166
     master_image_id = ami-0330d16a
-
-    # instance type for master node.
-    # defaults to NODE_INSTANCE_TYPE if not specified
     master_instance_type = m1.small
-
-    # AMI for worker nodes.
-    # Also used for the master node if MASTER_IMAGE_ID is not specified
-    # The base i386 StarCluster AMI is ami-0330d16a
-    # The base x86_64 StarCluster AMI is ami-0f30d166
     node_image_id = ami-0330d16a
-
-    # instance type for worker nodes. Also used for the master node if
-    # MASTER_INSTANCE_TYPE is not specified
     node_instance_type = m1.small
 
-    # availability zone
-    availability_zone = us-east-1c
+Cluster Settings
+^^^^^^^^^^^^^^^^
+The table below describes all required and optional settings for a cluster
+template in detail.
+
++----------------------+----------+---------------------------------------------------------------------------------+
+| Setting              | Required | Description                                                                     |
++======================+==========+=================================================================================+
+| keyname              | **Yes**  | The keypair to use for the cluster (the keypair must be defined in a            |
+|                      |          | **[keypair]** section)                                                          |
++----------------------+----------+---------------------------------------------------------------------------------+
+| cluster_size         | **Yes**  | Number of nodes in the cluster (including master)                               |
++----------------------+----------+---------------------------------------------------------------------------------+
+| node_image_id        | **Yes**  | The AMI to use for worker nodes                                                 |
++----------------------+----------+---------------------------------------------------------------------------------+
+| node_instance_type   | **Yes**  | The instance type for worker nodes                                              |
++----------------------+----------+---------------------------------------------------------------------------------+
+| cluster_user         | No       | The cluster user to create (defaults to sgeadmin)                               |
++----------------------+----------+---------------------------------------------------------------------------------+
+| cluster_shell        | No       | Sets the cluster user's shell (default: bash, options: bash, zsh, csh, ksh,     |
+|                      |          | tcsh)                                                                           |
++----------------------+----------+---------------------------------------------------------------------------------+
+| dns_prefix           | No       | If True, prefixes the dns name of nodes with the cluster tag. For example:      |
+|                      |          | master --> mycluster-master                                                     |
++----------------------+----------+---------------------------------------------------------------------------------+
+| master_image_id      | No       | The AMI to use for the master node. (defaults to **node_image_id**)             |
++----------------------+----------+---------------------------------------------------------------------------------+
+| master_instance_type | No       | The instance type for the master node. (defaults to **node_instance_type**)     |
++----------------------+----------+---------------------------------------------------------------------------------+
+| userdata_scripts     | No       | List of userdata scripts to use when launching instances                        |
++----------------------+----------+---------------------------------------------------------------------------------+
+| volumes              | No       | List of EBS volumes to attach and NFS-share to the cluster (each volume must be |
+|                      |          | defined in a **[volume]** section)                                              |
++----------------------+----------+---------------------------------------------------------------------------------+
+| plugins              | No       | List of StarCluster plugins to use when launching the cluster (each plugin must |
+|                      |          | be defined in a **[plugin]** section)                                           |
++----------------------+----------+---------------------------------------------------------------------------------+
+| permissions          | No       | List of permissions to apply to the cluster's security group (each permission   |
+|                      |          | must be defined in a **[permission]** section)                                  |
++----------------------+----------+---------------------------------------------------------------------------------+
+| userdata_scripts     | No       | List of user data scripts to run on boot for each instance in the cluster       |
++----------------------+----------+---------------------------------------------------------------------------------+
+| spot_bid             | No       | Always use spot instances with this cluster template                            |
++----------------------+----------+---------------------------------------------------------------------------------+
+| force_spot_master    | No       | When requesting a spot cluster this setting forces the master node to also be a |
+|                      |          | spot instance (default is for master not to be a spot instance for stability)   |
++----------------------+----------+---------------------------------------------------------------------------------+
+| availability_zone    | No       | Launch all cluster instances in a single availability zone (defaults to any     |
+|                      |          | available zone)                                                                 |
++----------------------+----------+---------------------------------------------------------------------------------+
+| disable_queue        | No       | Disables the setup and configuration of the Open Grid Scheduler (OGS, formerly  |
+|                      |          | SGE)                                                                            |
++----------------------+----------+---------------------------------------------------------------------------------+
+| disable_cloudinit    | No       | Do not use cloudinit for cluster accounting (only required if using non-        |
+|                      |          | cloudinit enabled AMIs)                                                         |
++----------------------+----------+---------------------------------------------------------------------------------+
+| subnet_id            | No       | The VPC subnet to use when launching cluster instances                          |
++----------------------+----------+---------------------------------------------------------------------------------+
+| public_ips           | No       | Automatically assign public IP addresses to all VPC cluster instances. Default  |
+|                      |          | is `False`.                                                                     |
+|                      |          |                                                                                 |
+|                      |          | **WARNING**: Enabling public IPs exposes your VPC cluster nodes to the internet |
+|                      |          | which may not be desirable. This option also requires a special VPC             |
+|                      |          | configuration - see :ref:`connect-vpc`                                          |
++----------------------+----------+---------------------------------------------------------------------------------+
+
+.. _using-vpc:
+
+Using the Virtual Private Cloud (VPC)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+From Amazon's `VPC page <http://aws.amazon.com/vpc/>`_:
+
+    "Amazon Virtual Private Cloud (Amazon VPC) lets you provision a logically
+    isolated section of the Amazon Web Services (AWS) Cloud where you can
+    launch AWS resources in a virtual network that you define. You have
+    complete control over your virtual networking environment, including
+    selection of your own IP address range, creation of subnets, and
+    configuration of route tables and network gateways."
+
+New AWS accounts use VPC by default via the `default VPC
+<http://docs.aws.amazon.com/AmazonVPC/latest/UserGuide/default-vpc.html>`_ and
+StarCluster supports this configuration without user intervention. However,
+users that wish to launch clusters in a **non-default** VPC must also provide
+the **subnet_id** setting in their cluster template(s):
+
+.. code-block:: ini
+
+    [cluster smallcluster]
+    keyname = mykeypair1
+    cluster_size = 2
+    node_image_id = ami-0330d16a
+    node_instance_type = m1.small
+    subnet_id = subnet-99999999
+
+Alternatively, users can specify or override the subnet ID at runtime via the
+``--subnet-id`` (``-N``) option to the ``start`` command::
+
+    $ starcluster start -N subnet-88888888 mycluster
+
+.. _connect-vpc:
+
+Connecting to a VPC Cluster
+^^^^^^^^^^^^^^^^^^^^^^^^^^^
+By default StarCluster does **not** automatically assign a public IP address to
+all VPC cluster instances which means **you must be on a machine within the VPC
+in order to successfully create, connect, and configure a cluster in the VPC**
+- otherwise StarCluster will hang indefinitely trying to connect to the nodes.
+StarCluster does not assign public IPs by default for two reasons:
+
+1. It opens the VPC to the internet which is a security risk
+2. It requires a special VPC configuration before it can be used successfully
+
+Specifically, your non-default VPC must have:
+
+1. An internet gateway attached to the VPC
+2. A route table entry linked to the internet gateway and associated with the
+   cluster's VPC subnet that has a destination CIDR block of ``0.0.0.0/0``
+
+StarCluster will raise a validation error if public IPs are requested and these
+requirements are not met. Assuming you're aware of the risks and have
+configured your VPC as mentioned above you can enable public IP addresses by
+setting ``public_ips=True`` in your cluster config:
+
+.. warning::
+
+    Enabling public IPs means that all VPC cluster nodes will be accessible
+    from the internet which may not be desirable depending on your
+    network/security requirements.
+
+.. code-block:: ini
+
+    [cluster smallcluster]
+    keyname = mykeypair1
+    cluster_size = 2
+    node_image_id = ami-0330d16a
+    node_instance_type = m1.small
+    subnet_id = subnet-99999999
+    public_ips = True
+
+This configuration will launch a cluster in a non-default VPC subnet and
+automatically assign a public IP address to all VPC cluster instances. You can
+also enable public IPs using the ``--public-ips`` option to the ``start``
+command::
+
+    $ starcluster start -N subnet-88888888 --public-ips mycluster
+
+.. note::
+
+    The ``--public-ips`` option only applies to **non-default** VPC clusters -
+    this option is *not* needed for clusters using the default VPC or EC2
+    classic. Both the default VPC and EC2 classic assign public IPs
+    automatically.
+
+Once public IPs have been enabled you can launch a cluster inside the VPC from
+a machine (e.g. your laptop) outside the VPC.
 
 Defining Multiple Cluster Templates
 -----------------------------------
