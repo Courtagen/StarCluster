@@ -134,7 +134,7 @@ class StreamingNodeAdd(object):
             up_nodes = filter(lambda n: n.is_up(), self.cluster.nodes)
             try:
                 self.cluster.run_plugins(method_name="on_add_node",
-                                         node=ready_instance, nodes=up_nodes)
+                                         node=ready_instance)
                 # success
                 del self.instances_nrm[ready_instance.id]
             except:
