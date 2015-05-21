@@ -539,7 +539,7 @@ class SGELoadBalancer(LoadBalancer):
 
     def _get_stats(self):
         master = self._cluster.master_node
-        now = self.get_remote_local_time()
+        now = self.get_remote_time()
         qatime = self.get_qatime(now)
         qacct_cmd = 'qacct -j -b ' + qatime
         qstat_cmd = 'qstat -u \* -xml -f -r'
@@ -721,7 +721,7 @@ class SGELoadBalancer(LoadBalancer):
             log.info("Queued jobs need more slots (%d) than available (%d)" %
                      (qw_slots, avail_slots))
             oldest_job_dt = self.stat.oldest_queued_job_age()
-            now = self.get_remote_local_time()
+            now = self.get_remote_time()
             age_delta = now - oldest_job_dt
             if age_delta.seconds > self.longest_allowed_queue_time:
                 log.info("A job has been waiting for %d seconds "
@@ -841,6 +841,6 @@ class SGELoadBalancer(LoadBalancer):
         been running.
         """
         dt = utils.iso_to_datetime_tuple(node.launch_time)
-        now = self.get_remote_local_time()
+        now = self.get_remote_time()
         timedelta = now - dt
         return timedelta.seconds / 60
