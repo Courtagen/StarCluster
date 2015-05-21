@@ -1,4 +1,4 @@
-# Copyright 2009-2013 Justin Riley
+# Copyright 2009-2014 Justin Riley
 #
 # This file is part of StarCluster.
 #
@@ -185,7 +185,6 @@ class S3ImageCreator(ImageCreator):
                      '-s %(secret_key)s' % config_dict, silent=False)
 
     def _cleanup(self):
-        #just in case...
         self._cleanup_pem_files()
         conn = self.host_ssh
         conn.execute('rm -f ~/.bash_history', silent=False)
@@ -302,7 +301,7 @@ class EBSImageCreator(ImageCreator):
         dev = None
         for i in string.ascii_lowercase[::-1]:
             dev = '/dev/sd%s' % i
-            if not dev in host.block_device_mapping:
+            if dev not in host.block_device_mapping:
                 break
         log.info("Attaching volume %s to instance %s on %s" %
                  (vol.id, host.id, dev))
@@ -311,7 +310,10 @@ class EBSImageCreator(ImageCreator):
             time.sleep(5)
         while not host_ssh.path_exists(dev):
             time.sleep(5)
-        host_ssh.execute('mkfs.ext3 -F %s' % dev)
+        log.info("Formatting %s..." % vol.id)
+        host_ssh.execute('mkfs.ext3 -F %s' % dev, silent=False)
+        log.info("Setting filesystem label on %s" % dev)
+        host_ssh.execute('e2label %s /' % dev)
         mount_point = '/ebs'
         while host_ssh.path_exists(mount_point):
             mount_point += '1'
@@ -325,8 +327,8 @@ class EBSImageCreator(ImageCreator):
         fstab.close()
         log.info("Syncing root filesystem to new volume (%s)" % vol.id)
         host_ssh.execute(
-            'rsync -avx --exclude %(mpt)s --exclude /root/.ssh / %(mpt)s' %
-            {'mpt': mount_point})
+            'rsync -aqx --exclude %(mpt)s --exclude /root/.ssh / %(mpt)s' %
+            {'mpt': mount_point}, silent=False)
         log.info("Unmounting %s from %s" % (dev, mount_point))
         host_ssh.execute('umount %s' % mount_point)
         log.info("Detaching volume %s from %s" % (dev, mount_point))
@@ -342,6 +344,8 @@ class EBSImageCreator(ImageCreator):
         vol.delete()
         log.info("Creating root block device map using snapshot %s" % snap.id)
         bmap = self.ec2.create_block_device_map(root_snapshot_id=snap.id,
+                                                instance_store=True,
+                                                num_ephemeral_drives=1,
                                                 add_ephemeral_drives=True)
         log.info("Registering new image...")
         img_id = self.ec2.register_image(name=self.name,

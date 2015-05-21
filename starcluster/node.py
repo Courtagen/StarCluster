@@ -1,4 +1,4 @@
-# Copyright 2009-2013 Justin Riley
+# Copyright 2009-2014 Justin Riley
 #
 # This file is part of StarCluster.
 #
@@ -19,8 +19,10 @@ import re
 import time
 import stat
 import base64
+import socket
 import posixpath
 import subprocess
+import datetime
 
 from starcluster import utils
 from starcluster import static
@@ -136,7 +138,7 @@ class Node(object):
         if not self._alias:
             alias = self.tags.get('alias')
             if not alias:
-                aliasestxt = self.user_data.get(static.UD_ALIASES_FNAME)
+                aliasestxt = self.user_data.get(static.UD_ALIASES_FNAME, '')
                 aliases = aliasestxt.splitlines()[2:]
                 index = self.ami_launch_index
                 try:
@@ -328,6 +330,14 @@ class Node(object):
         return self.instance.region
 
     @property
+    def vpc_id(self):
+        return self.instance.vpc_id
+
+    @property
+    def subnet_id(self):
+        return self.instance.subnet_id
+
+    @property
     def root_device_name(self):
         root_dev = self.instance.root_device_name
         bmap = self.block_device_mapping
@@ -363,7 +373,7 @@ class Node(object):
         """
         Add user (if exists) to group (if exists)
         """
-        if not user in self.get_user_map():
+        if user not in self.get_user_map():
             raise exception.BaseException("user %s does not exist" % user)
         if group in self.get_group_map():
             self.ssh.execute('gpasswd -a %s %s' % (user, 'utmp'))
@@ -501,8 +511,8 @@ class Node(object):
             log.debug("Using existing key: %s" % private_key)
             key = self.ssh.load_remote_rsa_key(private_key)
         else:
-            key = self.ssh.generate_rsa_key()
-        pubkey_contents = self.ssh.get_public_key(key)
+            key = sshutils.generate_rsa_key()
+        pubkey_contents = sshutils.get_public_key(key)
         if not key_exists or ignore_existing:
             # copy public key to remote machine
             pub_key = self.ssh.remote_file(public_key, 'w')
@@ -533,7 +543,7 @@ class Node(object):
             # add public key used to create the connection to user's
             # authorized_keys
             conn_key = self.ssh._pkey
-            conn_pubkey_contents = self.ssh.get_public_key(conn_key)
+            conn_pubkey_contents = sshutils.get_public_key(conn_key)
             if conn_pubkey_contents not in auth_keys_contents:
                 log.debug("adding conn_pubkey_contents")
                 auth_keys.write('%s\n' % conn_pubkey_contents)
@@ -656,7 +666,8 @@ class Node(object):
         $ node.export_fs_to_nodes(nodes=[node1,node2],
                                   export_paths=['/home', '/opt/sge6'])
         """
-        # setup /etc/exports
+        log.debug("Cleaning up potentially stale NFS entries")
+        self.stop_exporting_fs_to_nodes(nodes, paths=export_paths)
         log.info("Configuring NFS exports path(s):\n%s" %
                  ' '.join(export_paths))
         nfs_export_settings = "(async,no_root_squash,no_subtree_check,rw)"
@@ -673,7 +684,7 @@ class Node(object):
         etc_exports.close()
         self.ssh.execute('exportfs -fra')
 
-    def stop_exporting_fs_to_nodes(self, nodes):
+    def stop_exporting_fs_to_nodes(self, nodes, paths=None):
         """
         Removes nodes from this node's /etc/exportfs
 
@@ -682,7 +693,11 @@ class Node(object):
         Example:
         $ node.remove_export_fs_to_nodes(nodes=[node1,node2])
         """
-        regex = '|'.join(map(lambda x: x.alias, nodes))
+        if paths:
+            regex = '|'.join([' '.join([path, node.alias]) for path in paths
+                              for node in nodes])
+        else:
+            regex = '|'.join([n.alias for n in nodes])
         self.ssh.remove_lines_from_file('/etc/exports', regex)
         self.ssh.execute('exportfs -fra')
 
@@ -722,6 +737,7 @@ class Node(object):
                                           remote_paths))
         self.ssh.remove_lines_from_file('/etc/fstab', remote_paths_regex)
         fstab = self.ssh.remote_file('/etc/fstab', 'a')
+        mount_opts = 'rw,exec,noauto'
         for path in remote_paths:
             fstab.write('%s:%s %s nfs vers=3,rw,exec,noauto 0 0\n' %
                         (server_node.alias, path, path))
@@ -891,8 +907,7 @@ class Node(object):
             return spot[0]
 
     def is_master(self):
-        return str(self._alias) == 'master' \
-            or str(self._alias).endswith("-master")
+        return self.alias == 'master' or self.alias.endswith("-master")
 
     def is_instance_store(self):
         return self.instance.root_device_type == "instance-store"
@@ -984,6 +999,32 @@ class Node(object):
             return self.ssh.transport is not None
         except exception.SSHError:
             return False
+        except socket.error:
+            log.warning("error encountered while checking if {} is up:"
+                        .format(self.alias), exc_info=True)
+            return False
+
+    def is_impaired(self):
+        return bool(self.ec2.conn.get_all_instance_status(
+            instance_ids=[self.id],
+            filters={"instance-status.status": "impaired"}
+        ))
+
+    def handle_irresponsive_node(self):
+        if self.is_spot():
+            log.info(self.alias + " is a spot instance and will "
+                     "be terminated.")
+            self.terminate()
+            return True
+
+        self.stop()
+        time.sleep(10)
+        while self.update() != "stopped":
+            log.info("Waiting for node " + self.alias +
+                     "to be in a stopped state.")
+            time.sleep(10)
+        self.start()
+        return False
 
     def wait(self, interval=30):
         while not self.is_up():
@@ -1018,14 +1059,19 @@ class Node(object):
 
     @property
     def addr(self):
-        if self.instance.vpc_id:
-            #if instance has an elastic ip
-            if self.instance.ip_address:
-                return self.instance.ip_adress
+        """
+        Returns the most widely accessible address for the instance. This
+        property first checks if dns_name is available, then the public ip, and
+        finally the private ip. If none of these addresses are available it
+        returns None.
+        """
+        if not self.dns_name:
+            if self.ip_address:
+                return self.ip_address
             else:
-                return self.instance.private_ip_address
+                return self.private_ip_address
         else:
-            return self.instance.dns_name
+            return self.dns_name
 
     @property
     def ssh(self):
@@ -1036,7 +1082,7 @@ class Node(object):
         return self._ssh
 
     def shell(self, user=None, forward_x11=False, forward_agent=False,
-              command=None):
+              pseudo_tty=False, command=None):
         """
         Attempts to launch an interactive shell by first trying the system's
         ssh client. If the system does not have the ssh command it falls back
@@ -1064,11 +1110,10 @@ class Node(object):
                 sshopts += ' -Y'
             if forward_agent:
                 sshopts += ' -A'
-            addr = self.dns_name
-            if self.instance.vpc_id:
-                addr = self.private_ip_address
+            if pseudo_tty:
+                sshopts += ' -t'
             ssh_cmd = static.SSH_TEMPLATE % dict(opts=sshopts, user=user,
-                                                 host=addr)
+                                                 host=self.addr)
             if command:
                 command = "'source /etc/profile && %s'" % command
                 ssh_cmd = ' '.join([ssh_cmd, command])
@@ -1080,6 +1125,9 @@ class Node(object):
                 log.warn("X11 Forwarding not available in Python SSH client")
             if forward_agent:
                 log.warn("Authentication agent forwarding not available in " +
+                         "Python SSH client")
+            if pseudo_tty:
+                log.warn("Pseudo-tty allocation is not available in " +
                          "Python SSH client")
             if command:
                 orig_user = self.ssh.get_current_user()
@@ -1112,7 +1160,7 @@ class Node(object):
         pkgs is a string that contains one or more packages separated by a
         space
         """
-	self.apt_command('update')
+        self.apt_command('update')
         self.apt_command('install %s' % pkgs)
 
     def yum_command(self, cmd):
@@ -1158,3 +1206,53 @@ class Node(object):
     def __del__(self):
         if self._ssh:
             self._ssh.close()
+
+
+class NodeRecoveryManager(object):
+    def __init__(self, node, reboot_interval, n_reboot_restart):
+        self.node = node
+        self.reboot_interval = reboot_interval
+        self.n_reboot_restart = n_reboot_restart
+        self._set_next_restart()
+        self._set_next_reboot()
+
+    def _set_next_reboot(self):
+        self._next_reboot = utils.get_utc_now() + \
+            datetime.timedelta(minutes=self.reboot_interval)
+
+    def _set_next_restart(self):
+        self._next_restart = self.n_reboot_restart
+
+    def handle_reboot(self):
+        if self._next_restart == 0:
+            log.debug("Restarting node {}".format(self.node.alias))
+            terminated = self.node.handle_irresponsive_node()
+            if terminated:
+                log.debug("Terminated node {}".format(self.node.alias))
+                return False
+            self._set_next_restart()
+        else:
+            log.debug("Rebooting node {}".format(self.node.alias))
+            self.node.reboot()
+            self._next_restart -= 1
+        self._set_next_reboot()
+        return True
+
+    def check(self):
+        """
+        Manages the reboot/restart/terminate (when spot) of a node.
+        Returns True if the node is still alive, False otherwise.
+        """
+        log.debug("{} next reboot {}"
+                  .format(self.node.alias, self._next_reboot))
+        log.debug("{} next restart {}"
+                  .format(self.node.alias, self._next_restart))
+        if self.node.is_impaired():
+            log.info("{} is impaired".format(self.node.alias))
+            rez = self.handle_reboot()
+            log.debug("{} next restart {}"
+                      .format(self.node.alias, self._next_restart))
+            return rez
+        if utils.get_utc_now() > self._next_reboot:
+            return self.handle_reboot()
+        return True

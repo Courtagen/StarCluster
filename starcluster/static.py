@@ -1,4 +1,4 @@
-# Copyright 2009-2013 Justin Riley
+# Copyright 2009-2014 Justin Riley
 #
 # This file is part of StarCluster.
 #
@@ -55,7 +55,7 @@ def create_sc_config_dirs():
     __makedirs(STARCLUSTER_LOG_DIR)
 
 
-VERSION = "0.9999"
+VERSION = "0.95.6"
 PID = os.getpid()
 TMP_DIR = tempfile.gettempdir()
 if os.path.exists("/tmp"):
@@ -81,9 +81,9 @@ AWS_DEBUG_FILE = os.path.join(STARCLUSTER_LOG_DIR, 'aws-debug.log')
 CRASH_FILE = os.path.join(STARCLUSTER_LOG_DIR, 'crash-report-%d.txt' % PID)
 
 # StarCluster BASE AMIs (us-east-1)
-BASE_AMI_32 = "ami-7c5c3915"
-BASE_AMI_64 = "ami-765b3e1f"
-BASE_AMI_HVM = "ami-52a0c53b"
+BASE_AMI_32 = "ami-9bf9c9f2"
+BASE_AMI_64 = "ami-3393a45a"
+BASE_AMI_HVM = "ami-6b211202"
 
 SECURITY_GROUP_PREFIX = "sc-"
 #SECURITY_GROUP_TEMPLATE = '-'.join([SECURITY_GROUP_PREFIX, "%s"])
@@ -95,6 +95,7 @@ VOLUME_GROUP = SECURITY_GROUP_PREFIX + VOLUME_GROUP_NAME
 VERSION_TAG = SECURITY_GROUP_PREFIX + 'version'
 CORE_TAG = SECURITY_GROUP_PREFIX + 'core'
 USER_TAG = SECURITY_GROUP_PREFIX + 'user'
+MAX_TAG_LEN = 255
 
 # Internal StarCluster userdata filenames
 UD_PLUGINS_FNAME = "_sc_plugins.txt"
@@ -110,6 +111,9 @@ VOLUME_ATTACH_STATUS = ['attaching', 'attached', 'detaching', 'detached']
 
 INSTANCE_TYPES = {
     't1.micro': ['i386', 'x86_64'],
+    't2.micro': ['i386', 'x86_64'],
+    't2.small': ['i386', 'x86_64'],
+    't2.medium': ['i386', 'x86_64'],
     'm1.small': ['i386', 'x86_64'],
     'm1.medium': ['i386', 'x86_64'],
     'm1.large': ['x86_64'],
@@ -119,11 +123,20 @@ INSTANCE_TYPES = {
     'm2.xlarge': ['x86_64'],
     'm2.2xlarge': ['x86_64'],
     'm2.4xlarge': ['x86_64'],
+    'm3.medium': ['x86_64'],
+    'm3.large': ['x86_64'],
     'm3.xlarge': ['x86_64'],
     'm3.2xlarge': ['x86_64'],
+    'r3.large': ['x86_64'],
+    'r3.xlarge': ['x86_64'],
+    'r3.2xlarge': ['x86_64'],
+    'r3.4xlarge': ['x86_64'],
+    'r3.8xlarge': ['x86_64'],
     'cc1.4xlarge': ['x86_64'],
     'cc2.8xlarge': ['x86_64'],
     'cg1.4xlarge': ['x86_64'],
+    'g2.2xlarge': ['x86_64'],
+    'g2.8xlarge': ['x86_64'],
     'cr1.8xlarge': ['x86_64'],
     'hi1.4xlarge': ['x86_64'],
     'hs1.8xlarge': ['x86_64'],
@@ -147,11 +160,13 @@ T1_INSTANCE_TYPES = ['t1.micro']
 
 T2_INSTANCE_TYPES = ['t2.micro', 't2.small', 't2.medium']
 
-SEC_GEN_TYPES = ['m3.xlarge', 'm3.2xlarge']
+T2_INSTANCE_TYPES = ['t2.micro', 't2.small', 't2.medium']
+
+SEC_GEN_TYPES = ['m3.medium', 'm3.large', 'm3.xlarge', 'm3.2xlarge']
 
 CLUSTER_COMPUTE_TYPES = ['cc1.4xlarge', 'cc2.8xlarge']
 
-CLUSTER_GPU_TYPES = ['cg1.4xlarge']
+CLUSTER_GPU_TYPES = ['g2.2xlarge', 'g2.8xlarge', 'cg1.4xlarge']
 
 CLUSTER_HIMEM_TYPES = ['cr1.8xlarge']
 
@@ -267,8 +282,8 @@ PERMISSION_SETTINGS = {
     # skip this for now...these two options are mutually exclusive to
     # the four settings above and source_group is  less commonly
     # used. address this when someone requests it.
-    #'source_group': (str, False, None),
-    #'source_group_owner': (int, False, None),
+    # 'source_group': (str, False, None),
+    # 'source_group_owner': (int, False, None),
 }
 
 CLUSTER_SETTINGS = {
@@ -276,8 +291,8 @@ CLUSTER_SETTINGS = {
     'cluster_size': (int, True, None, None, None),
     'cluster_user': (str, False, 'sgeadmin', None, None),
     'cluster_shell': (str, False, 'bash', AVAILABLE_SHELLS.keys(), None),
-    'vpc_id': (str, False, None, None, None),
     'subnet_id': (str, False, None, None, None),
+    'public_ips': (bool, False, None, None, None),
     'master_image_id': (str, False, None, None, None),
     'master_instance_type': (str, False, None, INSTANCE_TYPES.keys(), None),
     'node_image_id': (str, True, None, None, None),
