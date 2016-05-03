@@ -30,9 +30,9 @@ try:
     extra = dict(test_suite="starcluster.tests",
                  tests_require="nose",
                  install_requires=["paramiko==1.15.2", "boto==2.34.0",
-                                   "workerpool>=0.9.2", "Jinja2>=2.7",
-                                   "decorator>=3.4.0", "pyasn1>=0.1.7",
-                                   "iptools>=0.6.1", "optcomplete>=1.2-devel"],
+                                   "workerpool==0.9.2", "Jinja2==2.7",
+                                   "decorator>=3.4.0", "pyasn1==0.1.7",
+                                   "iptools==0.6.1", "optcomplete==1.2-devel"],
                  include_package_data=True,
                  entry_points=dict(console_scripts=console_scripts),
                  zip_safe=False)
