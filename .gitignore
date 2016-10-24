@@ -1,4 +1,5 @@
 .*.sw*
+.idea
 *.pyc
 *.pyo
 *.pkl
