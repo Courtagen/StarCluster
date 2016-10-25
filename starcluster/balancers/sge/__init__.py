@@ -44,6 +44,7 @@ class SGEStats(object):
         self.queues = {}
         self.jobstats = self.jobstat_cachesize * [None]
         self.max_job_id = 0
+        self.healthy = True
 
     @property
     def first_job_id(self):
@@ -86,6 +87,12 @@ class SGEStats(object):
         for q in doc.getElementsByTagName("Queue-List"):
             name = q.getElementsByTagName("name")[0].childNodes[0].data
             slots = q.getElementsByTagName("slots_total")[0].childNodes[0].data
+
+            # Use the chance of qstat-ing to evaluate the health of nodes
+            load_avg = q.getElementsByTagName("load_avg")[0].childNodes[0].data
+            states = q.getElementsByTagName("states")[0].childNodes[0].data
+            if load_avg == "-NA-" and states == "au":
+                self.healthy = False
             self.queues[name] = dict(slots=int(slots))
             for job in q.getElementsByTagName("job_list"):
                 self.jobs.extend(self._parse_job(job, queue_name=name))
@@ -616,11 +623,17 @@ class SGELoadBalancer(LoadBalancer):
         if self.plot_stats:
             log.info("Plotting stats to directory: %s" % self.plot_output_dir)
         while(self._keep_polling):
+
             if not cluster.is_cluster_up():
                 log.info("Waiting for all nodes to come up...")
                 time.sleep(self.polling_interval)
                 continue
             self.get_stats()
+            if not self.healthy:
+                log.info("Discovered bad nodes, waiting for external resolution...")
+                time.sleep(self.polling_interval)
+                continue
+
             log.info("Execution hosts: %d" % len(self.stat.hosts), extra=raw)
             log.info("Queued jobs: %d" % len(self.stat.get_queued_jobs()),
                      extra=raw)
