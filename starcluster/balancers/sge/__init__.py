@@ -89,10 +89,11 @@ class SGEStats(object):
             slots = q.getElementsByTagName("slots_total")[0].childNodes[0].data
 
             # Use the chance of qstat-ing to evaluate the health of nodes
+            self.healthy = True
             load_avg = q.getElementsByTagName("load_avg")[0].childNodes[0].data
-            if load_avg == "-NA-":
+            if "-NA-" in load_avg:
                 states = q.getElementsByTagName("states")[0].childNodes[0].data
-                if states == "au":
+                if "au" in states:
                     self.healthy = False
             self.queues[name] = dict(slots=int(slots))
             for job in q.getElementsByTagName("job_list"):
