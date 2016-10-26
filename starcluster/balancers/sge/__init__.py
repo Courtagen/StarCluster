@@ -630,7 +630,7 @@ class SGELoadBalancer(LoadBalancer):
                 time.sleep(self.polling_interval)
                 continue
             self.get_stats()
-            if not self.healthy:
+            if not self.stat.healthy:
                 log.info("Discovered bad nodes, waiting for external resolution...")
                 time.sleep(self.polling_interval)
                 continue
