@@ -84,12 +84,12 @@ class SGEStats(object):
         self.jobs = []  # clear the old jobs
         self.queues = {}  # clear the old queues
         doc = xml.dom.minidom.parseString(qstat_out)
+        self.healthy = True
         for q in doc.getElementsByTagName("Queue-List"):
             name = q.getElementsByTagName("name")[0].childNodes[0].data
             slots = q.getElementsByTagName("slots_total")[0].childNodes[0].data
 
             # Use the chance of qstat-ing to evaluate the health of nodes
-            self.healthy = True
             load_avg = q.getElementsByTagName("load_avg")[0].childNodes[0].data
             if "-NA-" in load_avg:
                 try:
